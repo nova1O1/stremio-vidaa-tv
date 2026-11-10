@@ -43,6 +43,7 @@
         channelDown: 428,
         back: [8, 461, 10009],
         f: 70,
+        z: 90,
         escape: 27,
         bracketLeft: 219,
         bracketRight: 221

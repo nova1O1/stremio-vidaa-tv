@@ -1,4 +1,4 @@
-var CACHE_NAME = 'stremio-vidaa-v9-c19af52';
+var CACHE_NAME = 'stremio-vidaa-v9-9bc0a10';
 var ASSETS = [
   "./",
   "./PlusJakartaSans.ttf",

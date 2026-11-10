@@ -1,0 +1,100 @@
+// Crop-to-fit: remove letterbox / pillarbox bars in the player.
+// Modes cycle Fit -> Crop (fill, keep aspect, crop edges) -> Stretch (fill, distort).
+//   * On-screen button (top-right of the player, focusable, appears with any input)
+//   * Remote: Green then Blue within 1.5s
+//   * Keyboard: Z
+(function() {
+    var RT = window.__vidaaRuntime;
+    var log = RT.logger('crop');
+    var KEY = 'stremio_video_fit_mode';
+    var MODES = ['contain', 'cover', 'fill'];
+    var LABELS = { contain: 'Fit', cover: 'Crop to fill', fill: 'Stretch' };
+    var button = null;
+    var hideTimer = null;
+
+    function getMode() {
+        var m = RT.store.get(KEY, 'contain');
+        return MODES.indexOf(m) !== -1 ? m : 'contain';
+    }
+
+    function applyToVideo(video) {
+        if (!video) return;
+        var mode = getMode();
+        video.style.objectFit = mode === 'contain' ? '' : mode;
+        video.setAttribute('data-vidaa-fit', mode);
+    }
+
+    function applyAll() {
+        var vids = document.querySelectorAll('video');
+        for (var i = 0; i < vids.length; i++) applyToVideo(vids[i]);
+        if (button) button.textContent = '⤢ ' + LABELS[getMode()];
+    }
+
+    function toast(msg) {
+        try { window.__vidaaUI.toastCenter(msg, { ms: 1500 }); } catch (e) {}
+    }
+
+    function cycle() {
+        var next = MODES[(MODES.indexOf(getMode()) + 1) % MODES.length];
+        RT.store.set(KEY, next);
+        applyAll();
+        toast('Video: ' + LABELS[next]);
+        log('mode ->', next);
+        showButton();
+    }
+
+    function showButton() {
+        if (!button || !RT.inPlayer()) return;
+        button.style.opacity = '1';
+        button.style.pointerEvents = 'auto';
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(function() {
+            if (document.activeElement === button) { showButton(); return; }
+            button.style.opacity = '0';
+            button.style.pointerEvents = 'none';
+        }, 4000);
+    }
+
+    function buildButton() {
+        button = document.createElement('button');
+        button.id = 'vidaa-crop-btn';
+        button.type = 'button';
+        button.tabIndex = 0;
+        button.style.cssText = 'position:fixed;top:24px;right:24px;z-index:99998;padding:10px 18px;'
+            + 'font-size:18px;font-weight:600;color:#fff;background:rgba(12,12,16,0.85);'
+            + 'border:2px solid rgba(255,255,255,0.35);border-radius:10px;opacity:0;'
+            + 'pointer-events:none;transition:opacity .25s;cursor:pointer;outline:none;';
+        button.addEventListener('focus', function() { button.style.borderColor = '#7b5bf5'; });
+        button.addEventListener('blur', function() { button.style.borderColor = 'rgba(255,255,255,0.35)'; });
+        button.addEventListener('click', cycle);
+        document.body.appendChild(button);
+        applyAll();
+    }
+
+    function init() {
+        if (!document.body) { document.addEventListener('DOMContentLoaded', init); return; }
+        buildButton();
+        RT.dom.onVideoAdded(function(v) {
+            applyToVideo(v);
+            // Stremio re-applies inline styles on some state changes; keep ours.
+            try {
+                new MutationObserver(function() {
+                    if (getMode() !== 'contain' && v.style.objectFit !== getMode()) applyToVideo(v);
+                }).observe(v, { attributes: true, attributeFilter: ['style'] });
+            } catch (e) {}
+        });
+        ['keydown', 'mousemove', 'click'].forEach(function(ev) {
+            document.addEventListener(ev, function() { showButton(); }, true);
+        });
+        window.addEventListener('hashchange', function() {
+            if (!RT.inPlayer() && button) { button.style.opacity = '0'; button.style.pointerEvents = 'none'; }
+            else showButton();
+        });
+    }
+
+    window.__vidaaKeys.on('green+blue', cycle, { route: 'player', priority: 600, suppress: true, window: 1500 });
+    window.__vidaaKeys.on('z', cycle, { route: 'player' });
+
+    window.__vidaaCropToFit = { cycle: cycle, mode: getMode };
+    init();
+})();
