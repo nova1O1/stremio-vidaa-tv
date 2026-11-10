@@ -1,7 +1,7 @@
 // Crop-to-fit: remove letterbox / pillarbox bars in the player.
 // Modes cycle Fit -> Crop (fill, keep aspect, crop edges) -> Stretch (fill, distort).
 //   * On-screen button (top-right of the player, focusable, appears with any input)
-//   * Remote: Green then Blue within 1.5s
+//   * Remote: Up (while the button shows) then OK, or Green then Blue within 1.5s
 //   * Keyboard: Z
 (function() {
     var RT = window.__vidaaRuntime;
@@ -83,6 +83,29 @@
                 }).observe(v, { attributes: true, attributeFilter: ['style'] });
             } catch (e) {}
         });
+        // D-pad reach: Stremio owns the arrow keys, so while the button is showing
+        // Up focuses it, OK/Enter activates it, anything else hands focus back.
+        document.addEventListener('keydown', function(e) {
+            if (!RT.inPlayer() || !button) return;
+            var visible = button.style.opacity === '1';
+            var focused = document.activeElement === button;
+            var k = e.keyCode;
+            if (visible && !focused && k === 38) {
+                button.focus();
+                showButton();
+                e.preventDefault(); e.stopPropagation();
+                return;
+            }
+            if (focused) {
+                if (k === 13) {
+                    cycle();
+                    e.preventDefault(); e.stopPropagation();
+                } else if (k === 40 || k === 37 || k === 39 || k === 38 || k === 8 || k === 27 || k === 461 || k === 10009) {
+                    button.blur();
+                    e.preventDefault(); e.stopPropagation();
+                }
+            }
+        }, true);
         ['keydown', 'mousemove', 'click'].forEach(function(ev) {
             document.addEventListener(ev, function() { showButton(); }, true);
         });
