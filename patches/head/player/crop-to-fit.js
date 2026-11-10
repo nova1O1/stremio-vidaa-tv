@@ -44,7 +44,7 @@
         video.setAttribute('data-vidaa-fit', mode);
         if (!video.__vidaaCropBound) {
             video.__vidaaCropBound = true;
-            video.addEventListener('loadedmetadata', function() { applyToVideo(video); });
+            video.addEventListener('loadedmetadata', function() { applyAll(); });
             video.addEventListener('resize', function() { applyToVideo(video); });
         }
     }
@@ -52,7 +52,13 @@
     function applyAll() {
         var vids = document.querySelectorAll('video');
         for (var i = 0; i < vids.length; i++) applyToVideo(vids[i]);
-        if (button) button.textContent = '⤢ ' + LABELS[getMode()];
+        if (button) {
+            var v0 = vids[0];
+            var info = v0
+                ? '  [' + (v0.videoWidth || 0) + 'x' + (v0.videoHeight || 0) + ' in ' + (v0.clientWidth || 0) + 'x' + (v0.clientHeight || 0) + ', ' + (v0.style.transform || 'no scale') + ']'
+                : '  [no video]';
+            button.textContent = '⤢ ' + LABELS[getMode()] + info;
+        }
     }
 
     function toast(msg) {
