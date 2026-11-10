@@ -17,11 +17,36 @@
         return MODES.indexOf(m) !== -1 ? m : 'contain';
     }
 
+    // TV video planes often ignore object-fit, so scale the element itself.
+    // The element fills its container and the picture is letterboxed inside it,
+    // so work out the picture's on-screen size, then scale it to fill.
+    function computeTransform(video, mode) {
+        var cw = video.clientWidth || window.innerWidth;
+        var ch = video.clientHeight || window.innerHeight;
+        var vw = video.videoWidth, vh = video.videoHeight;
+        if (mode === 'contain' || !vw || !vh || !cw || !ch) return '';
+        var pw = Math.min(cw, ch * vw / vh); // picture size when fitted
+        var ph = Math.min(ch, cw * vh / vw);
+        var sx, sy;
+        if (mode === 'fill') { sx = cw / pw; sy = ch / ph; }
+        else { sx = sy = Math.max(cw / pw, ch / ph); }
+        if (Math.abs(sx - 1) < 0.005 && Math.abs(sy - 1) < 0.005) return '';
+        return 'scale(' + sx.toFixed(4) + ',' + sy.toFixed(4) + ')';
+    }
+
     function applyToVideo(video) {
         if (!video) return;
         var mode = getMode();
-        video.style.objectFit = mode === 'contain' ? '' : mode;
+        video.style.objectFit = '';
+        video.style.transformOrigin = 'center center';
+        video.style.transform = computeTransform(video, mode);
+        if (video.parentElement) video.parentElement.style.overflow = mode === 'contain' ? '' : 'hidden';
         video.setAttribute('data-vidaa-fit', mode);
+        if (!video.__vidaaCropBound) {
+            video.__vidaaCropBound = true;
+            video.addEventListener('loadedmetadata', function() { applyToVideo(video); });
+            video.addEventListener('resize', function() { applyToVideo(video); });
+        }
     }
 
     function applyAll() {
@@ -79,7 +104,7 @@
             // Stremio re-applies inline styles on some state changes; keep ours.
             try {
                 new MutationObserver(function() {
-                    if (getMode() !== 'contain' && v.style.objectFit !== getMode()) applyToVideo(v);
+                    if (getMode() !== 'contain' && !v.style.transform) applyToVideo(v);
                 }).observe(v, { attributes: true, attributeFilter: ['style'] });
             } catch (e) {}
         });
@@ -109,6 +134,7 @@
         ['keydown', 'mousemove', 'click'].forEach(function(ev) {
             document.addEventListener(ev, function() { showButton(); }, true);
         });
+        window.addEventListener('resize', applyAll);
         window.addEventListener('hashchange', function() {
             if (!RT.inPlayer() && button) { button.style.opacity = '0'; button.style.pointerEvents = 'none'; }
             else showButton();
